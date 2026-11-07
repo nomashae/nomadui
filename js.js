@@ -1,4 +1,3 @@
-
 (function () {
   'use strict';
 
@@ -15,15 +14,17 @@
     email: 'government@nomashae.org',
     tagline: 'Official website of the Republic of Nomashae'
   };
+  // Pages can override any of the above with window.NOMAD
   Object.assign(C, window.NOMAD || {});
 
-  
+  // Registry of custom elements: tag -> { render(el) returns HTML, mount(root) runs after insertion }
   var R = {};
   function def(tag, render, mount) { R[tag] = { render: render, mount: mount }; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function g(el, n, d) { var v = el.getAttribute(n); return v == null ? (d == null ? '' : d) : v; }
   function has(el, n) { return el.hasAttribute(n); }
-  function pass(el, skip) {            
+  // Copy every attribute except the ones in skip onto the rendered element
+  function pass(el, skip) {
     skip = skip || []; var s = '';
     for (var i = 0; i < el.attributes.length; i++) {
       var a = el.attributes[i];
@@ -44,7 +45,8 @@
   var SEP = ' &nbsp;·&nbsp; ';
   var DARK_BTN = '<button class="hdr-btn" id="dark-btn" type="button">Dark</button>';
 
-  
+  // ---- Page chrome ----
+
   def('topbar', function (el) {
     var act = g(el, 'active');
     function a(key, label) { return '<a href="' + C[key] + '"' + (act === key ? ' class="active" aria-current="page"' : '') + '>' + label + '</a>'; }
@@ -80,7 +82,8 @@
       + '</div><div class="footer-bottom">Nomad UI, the design language of this site, may be remixed and reused. Any remix must state "Using Nomad UI" and must not be presented as an official government page.</div></footer>';
   });
 
-  
+  // ---- Layout ----
+
   def('page-layout', function (el) {
     var v = g(el, 'variant');
     return '<div class="layout' + (v ? ' ' + (v === 'panel' ? 'has-panel' : v) : '') + '"' + pass(el, ['variant']) + '>' + el.innerHTML + '</div>';
@@ -94,20 +97,23 @@
       : esc(g(el, 'title'));
     return '<h4>' + head + '</h4>' + (has(el, 'plain') ? el.innerHTML : '<ul>' + el.innerHTML + '</ul>');
   });
-  def('side-link', function (el) {          
+  // With href it is a link, without it a button (used for the admin view switcher)
+  def('side-link', function (el) {
     var href = g(el, 'href');
     if (href) return '<li><a href="' + esc(href) + '"' + (has(el, 'current') ? ' aria-current="page"' : '') + pass(el, ['href', 'current']) + '>' + el.innerHTML + '</a></li>';
     return '<li><button type="button" class="side-btn"' + pass(el) + '>' + el.innerHTML + '</button></li>';
   });
 
-  
+  // ---- Content blocks ----
+
   def('nm-card', function (el) {
     var t = g(el, 'title');
     return '<div class="card"' + pass(el, ['title']) + '>' + (t ? '<h2>' + esc(t) + '</h2>' : '') + el.innerHTML + '</div>';
   });
   def('nm-lede', function (el) { return '<p class="lede"' + pass(el) + '>' + el.innerHTML + '</p>'; });
   def('nm-stats', function (el) { return '<div class="stats' + (has(el, 'auto') ? ' auto' : '') + '"' + pass(el, ['auto']) + '>' + el.innerHTML + '</div>'; });
-  def('nm-stat', function (el) {         
+  // count="collection" where="field=value" fills the number from a Firestore document count
+  def('nm-stat', function (el) {
     var nid = g(el, 'num-id'), cnt = g(el, 'count');
     return '<div class="stat"' + (cnt ? ' data-count="' + esc(cnt) + '" data-where="' + esc(g(el, 'where')) + '"' : '') + '><span class="stat-num"' + (nid ? ' id="' + esc(nid) + '"' : '') + '>' + esc(g(el, 'num', '...')) + '</span><span class="stat-label">' + esc(g(el, 'label')) + '</span></div>';
   }, function (st) {
@@ -120,7 +126,8 @@
       .catch(function (e) { console.warn('Count unavailable:', e); });
   });
   def('nm-grid', function (el) { return '<div class="grid"' + pass(el) + '>' + el.innerHTML + '</div>'; });
-  function tileLead(el) {               
+  // A flag image replaces the icon; if it fails to load the icon is shown instead
+  function tileLead(el) {
     var f = g(el, 'flag'); if (!f) return icon(g(el, 'icon'), 'tile-icon');
     var ic = g(el, 'icon');
     return '<div class="tile-icon has-flag"><img src="' + esc(f) + '" alt="' + esc(g(el, 'title')) + ' flag" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\'">'
@@ -144,36 +151,37 @@
   def('nm-button', function (el) {
     return '<a class="btn btn-' + esc(g(el, 'variant', 'solid')) + '"' + pass(el, ['variant']) + '>' + el.innerHTML + '</a>';
   });
-  def('nm-video', function (el) {        
+  def('nm-video', function (el) {
     return '<div class="video-wrap"' + pass(el, ['src', 'title']) + '><iframe src="' + esc(g(el, 'src')) + '" title="' + esc(g(el, 'title', 'Video')) + '" loading="lazy" frameborder="0" '
       + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
   });
-  def('nm-terminal', function (el) {      
+  def('nm-terminal', function (el) {
     return '<div class="terminal"><div class="terminal-code">' + el.innerHTML.replace(/^\n/, '') + '</div></div>';
   });
-  def('nm-summary', function (el) {      
+  def('nm-summary', function (el) {
     return '<div class="summary"' + pass(el, ['icon', 'status', 'live']) + '>' + icon(g(el, 'icon'), 'summary-icon')
       + '<div class="summary-body">' + el.innerHTML + (g(el, 'status') ? '<span class="pill block' + (has(el, 'live') ? ' pill-live' : '') + '">' + esc(g(el, 'status')) + '</span>' : '') + '</div></div>';
   });
-  def('nm-brand', function (el) {        
+  def('nm-brand', function (el) {
     return '<div class="lang-head">' + (g(el, 'mark') ? '<div class="lang-mark">' + esc(g(el, 'mark')) + '</div>' : '') + '<div><div class="lang-name">' + esc(g(el, 'name')) + '</div><div class="lang-tagline">' + esc(g(el, 'tagline')) + '</div></div></div>';
   });
 
-  def('nm-items', function (el) {        
+  def('nm-items', function (el) {
     return '<div class="items' + (has(el, 'list') ? ' list' : '') + (has(el, 'divided') ? ' divided' : '') + '"' + pass(el, ['list', 'divided']) + '>' + el.innerHTML + '</div>';
   });
-  def('nm-item', function (el) {         
+  def('nm-item', function (el) {
     var lead = g(el, 'num') ? '<span class="num">' + esc(g(el, 'num')) + '</span>'
       : g(el, 'icon') ? '<i class="fa-solid fa-' + esc(g(el, 'icon')) + '"></i>' : '';
     return '<div class="item"' + pass(el, ['num', 'icon', 'title', 'tag', 'logo', 'sev']) + '><h3>' + (has(el, 'logo') ? '<img src="' + logo('dark') + '" alt="eServices" class="inline-logo" data-nm-logo>' : '') + lead + esc(g(el, 'title')) + (g(el, 'tag') ? '<span class="item-tag' + (g(el, 'sev') ? ' sev-' + esc(g(el, 'sev')) : '') + '">' + esc(g(el, 'tag')) + '</span>' : '') + '</h3><p>' + el.innerHTML + '</p></div>';
   });
   def('nm-rules', function (el) { return '<div class="rules"' + pass(el) + '>' + el.innerHTML + '</div>'; });
-  def('nm-rule', function (el) {         
+  // Ticks by default, a cross when the wont attribute is set
+  def('nm-rule', function (el) {
     var will = !has(el, 'wont');
     return '<div class="rule ' + (will ? 'will' : 'wont') + '"><i class="fa-solid fa-' + (will ? 'check' : 'xmark') + '"></i><span>' + el.innerHTML + '</span></div>';
   });
 
-  def('nm-dropdown', function (el) {     
+  def('nm-dropdown', function (el) {
     var code = g(el, 'code'), sub = g(el, 'sub'), tag = g(el, 'tag'), chev = '<i class="fa-solid fa-chevron-down chev"></i>';
     var head = (code || sub || tag)
       ? (code ? '<span class="archive-id">' + esc(code) + '</span>' : '')
@@ -183,21 +191,22 @@
     return '<details class="archive"' + pass(el, ['title', 'code', 'sub', 'tag', 'live']) + '><summary>' + head + '</summary><div class="archive-body">' + el.innerHTML + '</div></details>';
   });
   def('nm-docs', function (el) { return '<div class="doc-grid"' + pass(el) + '>' + el.innerHTML + '</div>'; });
-  def('nm-doc', function (el) {          
+  def('nm-doc', function (el) {
     var s = esc(g(el, 'src'));
     return '<a href="' + s + '" target="_blank" rel="noopener" class="doc-thumb"><img src="' + s + '" alt="' + esc(g(el, 'alt')) + '"'
       + (g(el, 'w') ? ' width="' + esc(g(el, 'w')) + '"' : '') + (g(el, 'h') ? ' height="' + esc(g(el, 'h')) + '"' : '') + '></a>';
   });
   def('nm-caption', function (el) { return '<p class="archive-caption">' + el.innerHTML + '</p>'; });
 
-  def('nm-eservices', function (el) {    
+  def('nm-eservices', function (el) {
     var dark = has(el, 'on-dark');
     return '<img src="' + logo(dark ? 'grey' : 'dark') + '" alt="eServices" class="inline-logo"' + (dark ? '' : ' data-nm-logo') + '>';
   });
 
-  def('nm-search', function (el) {      
+  // Filters any elements matching the "for" selector by their text content
+  def('nm-search', function (el) {
     return '<div class="search" data-for="' + esc(g(el, 'for', '.archive')) + '"' + pass(el, ['for', 'placeholder', 'empty']) + '><div class="search-field"><i class="fa-solid fa-magnifying-glass"></i>'
-      + '<input type="search" placeholder="' + esc(g(el, 'placeholder', 'Search…')) + '" aria-label="Search" autocomplete="off"></div>'
+      + '<input type="search" placeholder="' + esc(g(el, 'placeholder', 'Search')) + '" aria-label="Search" autocomplete="off"></div>'
       + '<p class="search-empty" hidden>' + esc(g(el, 'empty', 'Nothing matches your search.')) + '</p></div>';
   }, function (box) {
     var input = box.querySelector('input'), empty = box.querySelector('.search-empty'), sel = box.getAttribute('data-for');
@@ -211,7 +220,8 @@
     });
   });
 
-  
+  // ---- Modal and toast ----
+
   def('nm-modal', function (el) {
     var id = g(el, 'id', 'modal');
     return '<div class="modal-overlay" id="' + esc(id) + '"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">'
@@ -222,7 +232,9 @@
     return '<div id="toast" role="status"><i class="fa-solid fa-circle-check" id="toast-icon"></i><span id="toast-msg"></span></div>';
   });
 
-  
+  // ---- Weather panel (Open-Meteo) ----
+
+  // WMO weather code -> [label, day icon, night icon]
   var WX = {
     0: ['Clear sky', 'day-sunny', 'night-clear'], 1: ['Mainly clear', 'day-sunny-overcast', 'night-alt-partly-cloudy'],
     2: ['Partly cloudy', 'day-cloudy', 'night-alt-cloudy'], 3: ['Overcast', 'cloudy'],
@@ -247,7 +259,7 @@
       + '<div class="wx-clock" data-r="clock">--:--</div><div class="wx-date" data-r="date"></div><div class="wx-zone" data-r="zone"></div>'
       + '<div class="wx-now"><div class="wx-temp"><span data-r="temp">?</span><small>°C</small></div>'
       + '<div class="wx-cond" aria-live="polite"><span data-r="cond">Loading</span><br><span class="wx-feels" data-r="feelsWrap" style="visibility:hidden">Feels like <span data-r="feels">?</span>°</span></div></div>'
-      + '<dl class="wx-list"><div><dt>Humidity</dt><dd data-r="hum">…</dd></div><div><dt>Wind</dt><dd data-r="wind">…</dd></div><div><dt>Sunrise</dt><dd data-r="rise">…</dd></div><div><dt>Sunset</dt><dd data-r="set">…</dd></div></dl>'
+      + '<dl class="wx-list"><div><dt>Humidity</dt><dd data-r="hum">...</dd></div><div><dt>Wind</dt><dd data-r="wind">...</dd></div><div><dt>Sunrise</dt><dd data-r="rise">...</dd></div><div><dt>Sunset</dt><dd data-r="set">...</dd></div></dl>'
       + '<div class="wx-fc" data-r="fc" hidden><h3>Next 3 days</h3><div data-r="fcRows"></div></div>'
       + '<p class="wx-foot"><span class="wx-err">Weather service unreachable. Retrying every minute.</span><span data-r="updated"></span><br>'
       + 'Data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a><br>Weather Icons by <a href="https://erikflowers.github.io/weather-icons/" target="_blank" rel="noopener">CSS Weather Icons</a></p>'
@@ -275,7 +287,8 @@
       r('feels').textContent = Math.round(c.apparent_temperature); r('feelsWrap').style.visibility = 'visible';
       r('hum').textContent = Math.round(c.relative_humidity_2m) + '%';
       r('wind').textContent = Math.round(c.wind_speed_10m) + ' km/h ' + COMPASS[Math.round(c.wind_direction_10m / 22.5) % 16];
-      var today = c.time.slice(0, 10), t = d.time.indexOf(today);   
+      // c.time is local to the panel's timezone, so its date prefix matches daily.time
+      var today = c.time.slice(0, 10), t = d.time.indexOf(today);
       if (t > -1) { r('rise').textContent = d.sunrise[t].slice(11, 16); r('set').textContent = d.sunset[t].slice(11, 16); }
       var html = '', n = 0;
       for (var k = 0; k < d.time.length && n < 3; k++) {
@@ -307,10 +320,11 @@
     tick(); setInterval(tick, 30000); load();
   });
 
-  
+  // ---- Forms ----
+
   def('nm-form', function (el) { return '<form novalidate' + pass(el) + '>' + el.innerHTML + '</form>'; });
 
-  def('nm-field', function (el) {        
+  def('nm-field', function (el) {
     var id = esc(g(el, 'name')), type = g(el, 'type', 'text'), ph = ' placeholder="' + esc(g(el, 'placeholder')) + '"';
     var ac = g(el, 'autocomplete') ? ' autocomplete="' + esc(g(el, 'autocomplete')) + '"' : '';
     var mx = g(el, 'max') ? ' maxlength="' + esc(g(el, 'max')) + '"' : '';
@@ -318,19 +332,19 @@
       ? '<textarea id="' + id + '" rows="' + esc(g(el, 'rows', '4')) + '"' + ph + '></textarea>'
       : '<input type="' + esc(type) + '" id="' + id + '"' + ph + ac + mx + '>';
     return '<div class="form-field" data-field="' + id + '"' + (has(el, 'required') ? ' data-req' : '') + (has(el, 'nospace') ? ' data-nospace' : '') + '>'
-      + '<label for="' + id + '">' + esc(g(el, 'label')) + (has(el, 'required') ? ' <span class="req">★</span>' : '') + (has(el, 'optional') ? ' <span class="opt">(optional)</span>' : '') + '</label>' + ctl
+      + '<label for="' + id + '">' + esc(g(el, 'label')) + (has(el, 'required') ? ' <span class="req">*</span>' : '') + (has(el, 'optional') ? ' <span class="opt">(optional)</span>' : '') + '</label>' + ctl
       + (g(el, 'hint') ? '<div class="field-hint"><i class="fa-solid fa-circle-info"></i> ' + esc(g(el, 'hint')) + '</div>' : '')
       + (g(el, 'error') ? '<div class="field-err">' + esc(g(el, 'error')) + '</div>' : '') + '</div>';
   });
 
-  def('nm-btn', function (el) {          
+  def('nm-btn', function (el) {
     var ic = g(el, 'icon');
     return '<button type="' + esc(g(el, 'type', 'button')) + '" class="btn-primary' + (has(el, 'block') ? ' btn-block' : '') + '"'
       + (g(el, 'act') ? ' data-act="' + esc(g(el, 'act')) + '"' : '') + pass(el, ['type', 'block', 'act', 'icon']) + '>'
       + (ic ? '<i class="fa-solid fa-' + esc(ic) + '"></i> ' : '') + el.innerHTML + '</button>';
   });
 
-  def('nm-chips', function (el) {        
+  def('nm-chips', function (el) {
     var n = esc(g(el, 'name'));
     return '<div class="form-field"><label id="' + n + '-label">' + esc(g(el, 'label')) + '</label>'
       + '<div class="cat-selector" role="radiogroup" aria-labelledby="' + n + '-label" data-chips="' + n + '">' + el.innerHTML + '</div></div>';
@@ -347,20 +361,22 @@
     return '<button type="button" class="filter-btn' + (has(el, 'active') ? ' active' : '') + '" data-filter="' + esc(g(el, 'value')) + '"' + pass(el, ['value', 'active']) + '>' + el.innerHTML + '</button>';
   });
 
-  def('nm-view', function (el) {         
+  def('nm-view', function (el) {
     return '<div class="admin-view' + (has(el, 'active') ? ' active' : '') + '" id="view-' + esc(g(el, 'name')) + '"' + pass(el, ['name', 'active']) + '>' + el.innerHTML + '</div>';
   });
-  def('nm-list', function (el) {         
-    return '<div' + pass(el, ['loading']) + '><p class="empty">' + esc(g(el, 'loading', 'Loading…')) + '</p></div>';
+  def('nm-list', function (el) {
+    return '<div' + pass(el, ['loading']) + '><p class="empty">' + esc(g(el, 'loading', 'Loading')) + '</p></div>';
   });
 
-  
+  // ---- Admin portal ----
+
+  // Firebase is only imported on pages that contain <nm-portal>
   def('nm-portal', function () { return '<i hidden data-nm-portal></i>'; }, function () {
-    Promise.resolve().then(function () {   
+    Promise.resolve().then(function () {
       var V = 'https://www.gstatic.com/firebasejs/10.12.2/';
       Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-firestore.js'), import(V + 'firebase-auth.js')])
         .then(function (m) { portal(m[0], m[1], m[2]); })
-        .catch(function (e) { console.error(e); toast('Could not load Firebase.', true); });
+        .catch(function (e) { console.error(e); toast('The portal could not start. Refresh the page and try again.', true); });
     });
   });
 
@@ -375,7 +391,7 @@
     var col = function (n) { return F.collection(db, n); };
     var nameOf = function (d) { return d.firstname + (d.lastname ? ' ' + d.lastname : ''); };
 
-    
+    // Auth gate: show the login form or the admin layout
     H.onAuthStateChanged(auth, function (user) {
       $('login-layout').hidden = !!user;
       $('admin-layout').hidden = !user;
@@ -393,10 +409,10 @@
 
     $('login-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var email = $('login-email').value.trim(), pass = $('login-pass').value, b = $('login-btn');
-      if (!email || !pass) return toast('Enter your email and password.', true);
+      var email = $('login-email').value.trim(), password = $('login-pass').value, b = $('login-btn');
+      if (!email || !password) return toast('Enter your email and password.', true);
       b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
-      H.signInWithEmailAndPassword(auth, email, pass).catch(function (err) {
+      H.signInWithEmailAndPassword(auth, email, password).catch(function (err) {
         b.disabled = false; b.innerHTML = LOGIN_LABEL; console.error(err);
         var bad = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'];
         toast(bad.indexOf(err.code) > -1 ? 'Sign in failed. Check your email and password.'
@@ -405,7 +421,6 @@
       });
     });
 
-    
     function showView(id) {
       [].forEach.call(document.querySelectorAll('.admin-view'), function (v) { v.classList.toggle('active', v.id === 'view-' + id); });
       [].forEach.call(document.querySelectorAll('.side-btn[data-view]'), function (b) {
@@ -414,10 +429,11 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    
+    // Applications
     function actBtn(act, id, label, cls, status) {
       return '<button type="button" class="act-btn ' + cls + '" data-act="' + act + '" data-id="' + esc(id) + '"' + (status ? ' data-status="' + status + '"' : '') + '>' + label + '</button>';
     }
+    // Only offer the statuses the application is not already in
     function statusBtns(act, id, d) {
       return (d.status !== 'approved' ? actBtn(act, id, 'Approve', 'approve', 'approved') : '')
         + (d.status !== 'rejected' ? actBtn(act, id, 'Reject', 'reject', 'rejected') : '')
@@ -453,6 +469,7 @@
         renderApps(snap);
       } catch (e) { console.error(e); $('apps-list').innerHTML = '<p class="empty" style="color:var(--err)">Error loading applications.</p>'; }
     }
+    // Re-render from the cached snapshot so filter changes and status updates don't need another read
     function renderApps(snap) {
       if (snap) lastSnap = snap;
       var rows = [];
@@ -473,7 +490,7 @@
       return update(id, patch, 'Status updated to ' + status);
     }
 
-    
+    // Application detail modal
     function openModal(id) {
       var d = appCache.get(id); if (!d) return;
       var rows = [['Track ID', d.trackId], ['Name', nameOf(d) + ' (@' + d.username + ')'], ['Email', d.email], ['Date of birth', d.dob], ['Region', d.region],
@@ -484,7 +501,7 @@
         + '<div class="modal-field"><div class="mk">Status</div><div class="mv"><span class="badge ' + (BADGE[d.status] || 'badge-pending') + '">' + esc(d.status) + '</span></div></div>'
         + (d.statement ? '<div class="modal-label">Statement</div><div class="modal-statement">' + esc(d.statement) + '</div>' : '')
         + '<div class="form-divider"></div><div class="form-field"><label for="modal-note">Admin note (visible to applicant)</label>'
-        + '<textarea id="modal-note" rows="3" placeholder="Optional note to the applicant…">' + esc(d.adminNote || '') + '</textarea></div>'
+        + '<textarea id="modal-note" rows="3" placeholder="Optional note to the applicant">' + esc(d.adminNote || '') + '</textarea></div>'
         + '<div class="modal-actions">' + statusBtns('modal-status', id, d) + actBtn('save-note', id, '<i class="fa-solid fa-floppy-disk"></i> Save Note', '') + '</div>';
       $('modal').classList.add('open'); $('modal-close-btn').focus();
     }
@@ -492,7 +509,7 @@
     $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-    
+    // News
     async function postNews() {
       var title = $('news-title').value.trim(), body = $('news-body').value.trim();
       var author = $('news-author').value.trim() || 'Ministry of Nomashae';
@@ -525,7 +542,7 @@
       catch (e) { toast('Error: ' + e.message, true); }
     }
 
-    
+    // One delegated handler for every data-act / data-view / data-filter control
     document.addEventListener('click', function (e) {
       var el = e.target.closest('[data-act],[data-view],[data-filter]'); if (!el) return;
       var d = el.dataset;
@@ -548,11 +565,12 @@
     });
   }
 
-  
-  def('nm-cols', function (el) { return '<div class="grid-2"' + pass(el) + '>' + el.innerHTML + '</div>'; });
-  def('nm-star', function () { return '<span class="req">★</span>'; });
+  // ---- Application wizard ----
 
-  def('nm-choices', function (el) {      
+  def('nm-cols', function (el) { return '<div class="grid-2"' + pass(el) + '>' + el.innerHTML + '</div>'; });
+  def('nm-star', function () { return '<span class="req">*</span>'; });
+
+  def('nm-choices', function (el) {
     var n = esc(g(el, 'name'));
     return '<div class="choice-field" data-field="' + n + '"' + (has(el, 'required') ? ' data-req' : '') + '><div class="region-grid" data-choices="' + n + '">' + el.innerHTML + '</div>'
       + (g(el, 'error') ? '<div class="field-err">' + esc(g(el, 'error')) + '</div>' : '') + '</div>';
@@ -569,12 +587,13 @@
   def('nm-check', function (el) {
     var id = esc(g(el, 'name'));
     return '<div class="form-field check-field" data-field="' + id + '"' + (has(el, 'required') ? ' data-req' : '') + '><label class="check" for="' + id + '"><input type="checkbox" id="' + id + '"><span>'
-      + el.innerHTML + (has(el, 'required') ? ' <span class="req">★</span>' : '') + '</span></label>'
+      + el.innerHTML + (has(el, 'required') ? ' <span class="req">*</span>' : '') + '</span></label>'
       + (g(el, 'error') ? '<div class="field-err">' + esc(g(el, 'error')) + '</div>' : '') + '</div>';
   });
+  // items="Label=fieldId;Label=fieldId" lists the answers back to the applicant before submit
   def('nm-review', function (el) { return '<div class="review-block" data-items="' + esc(g(el, 'items')) + '"></div>'; });
 
-  def('nm-step', function (el) {         
+  def('nm-step', function (el) {
     var n = +g(el, 'n', 1), ic = g(el, 'icon');
     var nav = '<div class="step-nav">'
       + (n > 1 ? '<button type="button" class="btn-ghost" data-act="prev"><i class="fa-solid fa-arrow-left"></i> ' + esc(g(el, 'back', 'Back')) + '</button>' : '<span></span>')
@@ -589,7 +608,7 @@
       + el.innerHTML + nav + '</div>';
   });
 
-  def('nm-success', function (el) {      
+  def('nm-success', function (el) {
     return '<div class="card success-screen"' + pass(el, ['title']) + '><div class="success-icon"><i class="fa-solid fa-check"></i></div><h2>' + esc(g(el, 'title', 'Done')) + '</h2>' + el.innerHTML + '</div>';
   });
   def('nm-tracker', function (el) {
@@ -598,7 +617,8 @@
   });
   def('nm-actions', function (el) { return '<div class="success-actions"' + pass(el) + '>' + el.innerHTML + '</div>'; });
 
-  def('nm-apply', function (el) {        
+  // Steps are numbered from their order; the last one becomes the submit step
+  def('nm-apply', function (el) {
     var steps = [].slice.call(el.querySelectorAll(':scope > nm-step'));
     steps.forEach(function (s, i) { s.setAttribute('n', i + 1); if (i === steps.length - 1) s.setAttribute('last', ''); });
     var bar = steps.map(function (s, i) {
@@ -609,7 +629,8 @@
   }, function (box) {
     var step = 1, FB = null;
 
-    function fb() {                      
+    // Lazy Firebase load; reset on failure so the next attempt retries
+    function fb() {
       if (!FB) {
         var V = 'https://www.gstatic.com/firebasejs/10.12.2/';
         FB = Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-firestore.js')]).then(function (m) {
@@ -619,6 +640,7 @@
       }
       return FB;
     }
+    // Start loading in the background so submit is quick
     Promise.resolve().then(fb).catch(function () {});
 
     function val(name) {
@@ -627,7 +649,7 @@
       var r = box.querySelector('input[name="' + name + '"]:checked');
       return r ? r.value : '';
     }
-    function check(stepEl) {             
+    function check(stepEl) {
       var ok = true;
       [].forEach.call(stepEl.querySelectorAll('[data-field]'), function (f) {
         var v = val(f.getAttribute('data-field'));
@@ -636,7 +658,7 @@
       });
       return ok;
     }
-    function review() {                  
+    function review() {
       [].forEach.call(box.querySelectorAll('.review-block'), function (b) {
         b.replaceChildren();
         b.getAttribute('data-items').split(';').forEach(function (it) {
@@ -656,8 +678,8 @@
       window.scrollTo({ top: 0, behavior: 'smooth' }); step = i;
     }
 
-    
-    var CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   
+    // Tracking IDs skip look-alike characters (no 0/O, 1/I)
+    var CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     function bytes(n) { return crypto.getRandomValues(new Uint8Array(n)); }
     function trackId() {
       var b = bytes(8), p = function (i) { return CH[b[i] % 32]; };
@@ -678,7 +700,7 @@
       for (var i = 0; i < all.length; i++) if (!check(all[i])) return show(i + 1);
 
       var label = btn.innerHTML, reset = function () { btn.disabled = false; btn.innerHTML = label; };
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting…';
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting';
 
       var S;
       try { S = await fb(); }
@@ -686,11 +708,11 @@
 
       try {
         var id = trackId(), s1 = hex(), s2 = hex(), region = val('region');
-        while (s1 === s2) s2 = hex();
+        while (s1 === s2) s2 = hex(); // the two secret codes must differ
         await S.F.addDoc(S.F.collection(S.db, box.getAttribute('data-collection')), {
           trackId: id, firstname: val('firstname'), lastname: val('lastname'), username: val('username'),
           region: region, nationKey: nationKey(region), status: 'pending',
-          secretHex1: s1, secretHex2: s2,                    
+          secretHex1: s1, secretHex2: s2,
           submittedAt: S.F.serverTimestamp(), adminNote: ''
         });
         document.getElementById('tracker-id-display').textContent = id;
@@ -700,8 +722,8 @@
       } catch (e) {
         reset(); console.error(e);
         toast(e && (e.code === 'unavailable' || (e.message || '').indexOf('offline') > -1)
-          ? 'No internet connection. Try again when you are online.'
-          : 'Submission failed. Try again, and contact ' + C.email + ' if it keeps happening.', true);
+          ? 'You appear to be offline. Reconnect and submit again.'
+          : 'Your application was not saved. Try again, or email ' + C.email + ' if it keeps failing.', true);
       }
     }
 
@@ -719,13 +741,16 @@
     });
   });
 
-  
-  function fmtTrack(el) {                
+  // ---- Shared helpers for tracking and ID cards ----
+
+  // Keeps the input in the form NM-XXXX-XXXX while typing
+  function fmtTrack(el) {
     var v = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^NM/, '');
     el.value = 'NM-' + (v.length <= 4 ? v : v.slice(0, 4) + '-' + v.slice(4, 8));
   }
   var LIBS = {};
-  function lib(src) {                    
+  // Loads a script once; a failed load is forgotten so it can be retried
+  function lib(src) {
     if (!LIBS[src]) {
       LIBS[src] = new Promise(function (ok, no) {
         var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s);
@@ -734,7 +759,7 @@
     return LIBS[src];
   }
   var FS = null;
-  function firestore() {                 
+  function firestore() {
     if (!FS) {
       var V = 'https://www.gstatic.com/firebasejs/10.12.2/';
       FS = Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-firestore.js')]).then(function (m) {
@@ -745,7 +770,7 @@
     return FS;
   }
 
-  def('nm-trackbar', function (el) {     
+  def('nm-trackbar', function (el) {
     var ic = g(el, 'icon');
     return '<div class="track-row"' + pass(el, ['button', 'icon', 'label', 'placeholder']) + '><div class="form-field"><label for="inp-track">' + esc(g(el, 'label', 'Tracking ID')) + '</label>'
       + '<input type="text" id="inp-track" placeholder="' + esc(g(el, 'placeholder', 'NM-XXXX-XXXX')) + '" maxlength="12" autocomplete="off"></div>'
@@ -756,15 +781,17 @@
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') btn.click(); });
   });
 
-  def('nm-idcard', function (el) {       
+  // ---- Citizen ID card ----
+
+  def('nm-idcard', function (el) {
     return '<div class="idcard-app"' + pass(el) + '>' + el.innerHTML + '<div id="card-result" aria-live="polite"></div></div>';
   }, function (box) {
     var NATION = {
-      fire:    { label: 'Fire Nation',   icon: '🔥', cls: 'card-fire' },
-      water:   { label: 'Water Tribe',   icon: '💧', cls: 'card-water' },
-      air:     { label: 'Air Nomads',    icon: '🌀', cls: 'card-air' },
-      earth:   { label: 'Earth Kingdom', icon: '🌍', cls: 'card-earth' },
-      neutral: { label: 'Republic City', icon: '⚖️', cls: 'card-neutral' }
+      fire:    { label: 'Fire Nation',   icon: 'fa-fire',           cls: 'card-fire' },
+      water:   { label: 'Water Tribe',   icon: 'fa-droplet',        cls: 'card-water' },
+      air:     { label: 'Air Nomads',    icon: 'fa-wind',           cls: 'card-air' },
+      earth:   { label: 'Earth Kingdom', icon: 'fa-mountain',       cls: 'card-earth' },
+      neutral: { label: 'Republic City', icon: 'fa-scale-balanced', cls: 'card-neutral' }
     };
     var QR = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     var H2C = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
@@ -777,7 +804,7 @@
 
       var S;
       try { S = await firestore(); }
-      catch (e) { console.error(e); out().innerHTML = ''; return toast('Cannot reach the service right now. Refresh the page and try again.', true); }
+      catch (e) { console.error(e); out().innerHTML = ''; return toast('Could not connect to look up that ID. Refresh the page and try again.', true); }
 
       try {
         var F = S.F, snap = await F.getDocs(F.query(F.collection(S.db, 'applications'), F.where('trackId', '==', raw)));
@@ -795,14 +822,14 @@
           return;
         }
         renderCard(d);
-      } catch (e) { out().innerHTML = ''; toast('Could not reach the Ministry. Try again shortly.', true); console.error(e); }
+      } catch (e) { out().innerHTML = ''; toast('The Ministry did not respond. Try again in a moment.', true); console.error(e); }
     }
 
-    function renderCard(d) {             
+    function renderCard(d) {
       var meta = NATION[d.nationKey] || NATION[d.nation] || NATION.neutral;
       var fmt = { day: 'numeric', month: 'short', year: 'numeric' };
       var issued = (d.approvedAt && d.approvedAt.toDate ? d.approvedAt.toDate() : new Date()).toLocaleDateString('en-GB', fmt);
-      var num = 'C-' + d.trackId.replace('NM-', '').replace('-', '');          
+      var num = 'C-' + d.trackId.replace('NM-', '').replace('-', '');
       var name = d.firstname + (d.lastname ? ' ' + d.lastname : '');
 
       out().innerHTML = `
@@ -811,8 +838,8 @@
           <div class="card-scene"><div class="id-card-wrap">
             <div class="id-card ${meta.cls}" id="id-card-el">
               <div class="id-card-header">
-                <div><div class="id-card-nation">${meta.icon} ${meta.label}</div><div class="id-card-logo">Nomashae</div></div>
-                <div class="id-card-mark">${meta.icon}</div>
+                <div><div class="id-card-nation"><i class="fa-solid ${meta.icon}"></i> ${meta.label}</div><div class="id-card-logo">Nomashae</div></div>
+                <div class="id-card-mark"><i class="fa-solid ${meta.icon}"></i></div>
               </div>
               <div class="id-card-stripe"></div>
               <div class="id-card-body">
@@ -829,7 +856,7 @@
                 </div>
               </div>
               <div class="id-card-footer">
-                <div><div class="id-card-footer-seal">⚖</div><div class="id-card-footer-text">Republic of<br>Nomashae</div></div>
+                <div><div class="id-card-footer-seal"><i class="fa-solid fa-scale-balanced"></i></div><div class="id-card-footer-text">Republic of<br>Nomashae</div></div>
                 <div class="qr-box" id="qr-container"></div>
               </div>
             </div>
@@ -842,12 +869,13 @@
             <p>Your secret codes are stored in the Ministry's records. They were assigned when you applied, are never shown publicly, and are only used by Ministry officials to verify your identity.</p></div>
         </div>`;
 
-      
+      // The QR code links to the public status page for this application
       var url = location.origin + location.pathname.replace('id-card.html', '') + 'track.html?id=' + encodeURIComponent(d.trackId);
       lib(QR).then(function () {
         new window.QRCode(box.querySelector('#qr-container'), { text: url, width: 64, height: 64, colorDark: '#000000', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
       }).catch(function (e) { console.error(e); });
-      lib(H2C).catch(function () {});    
+      // Preload html2canvas so the first download is instant; download() retries if this fails
+      lib(H2C).catch(function () {});
     }
 
     function download() {
@@ -865,17 +893,21 @@
       if (a === 'lookup') load(); else if (a === 'download') download(); else if (a === 'print') window.print();
     });
 
-    Promise.resolve().then(function () {   
+    // Support ?track=NM-XXXX-XXXX links
+    Promise.resolve().then(function () {
       var t = new URLSearchParams(location.search).get('track'), input = box.querySelector('#inp-track');
       if (t && input) { input.value = t; fmtTrack(input); load(); }
     });
   });
 
-  def('nm-news', function (el) {         
+  // ---- News feed ----
+
+  def('nm-news', function (el) {
     return '<div class="news-list" data-collection="' + esc(g(el, 'collection', 'news')) + '" data-limit="' + esc(g(el, 'limit', '9')) + '"' + pass(el, ['collection', 'limit']) + '>'
-      + '<div class="notice"><span class="tag">Loading</span><p>Loading the latest news from the Ministry…</p></div></div>';
+      + '<div class="notice"><span class="tag">Loading</span><p>Fetching the latest news from the Ministry.</p></div></div>';
   }, function (list) {
-    function P(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; return n; }   
+    // Built with textContent rather than innerHTML because the content comes from the database
+    function P(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; return n; }
     function notice(tag, title, body, bodyCls, meta) {
       var box = P('div', 'notice');
       box.append(P('span', 'tag', tag));
@@ -901,11 +933,14 @@
     });
   });
 
-  
+  // ---- Boot ----
+
+  // Replace custom elements one at a time, innermost-last, so parents that read
+  // el.innerHTML see children still as custom tags and render them in a later pass
   var SEL = Object.keys(R).join(',');
   function run(root) {
     var el, tpl = document.createElement('template');
-    while ((el = (root || document).querySelector(SEL))) {   
+    while ((el = (root || document).querySelector(SEL))) {
       var d = R[el.localName];
       tpl.innerHTML = d.render(el);
       var first = tpl.content.firstElementChild;
@@ -914,7 +949,6 @@
     }
   }
 
-  
   var dark = false;
   try { dark = localStorage.getItem('nmDark') === 'true'; } catch (e) {}
   function applyTheme() {
@@ -926,6 +960,7 @@
   function toggleTheme() { dark = !dark; try { localStorage.setItem('nmDark', dark); } catch (e) {} applyTheme(); }
   document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#dark-btn')) toggleTheme(); });
 
+  // Keep --bar-h in sync with the sticky top bar for anything positioned below it
   function syncBar() {
     var bar = document.querySelector('.top-bar');
     if (bar) document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px');
@@ -938,7 +973,8 @@
     t.classList.add('show'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('show'); }, 3500);
   }
 
-  function openHash() {                  
+  // Opens the <details> matching the URL hash, so links can point at a dropdown
+  function openHash() {
     var id = location.hash.slice(1), d = id && document.getElementById(id);
     if (d && d.tagName === 'DETAILS') d.open = true;
   }
